@@ -2,63 +2,153 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dushyant Rana</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mobile Pedometer</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       margin: 0;
-      padding: 20px;
-      background-color: #090909;
-      color: #0e0e0e;
+      padding: 2rem;
+      background: #f0f4f8;
+      color: #333;
     }
     .container {
-      max-width: 600px;
+      max-width: 400px;
       margin: auto;
-      background: rgb(250, 253, 251);
-      padding: 20px;
-      border-radius: 8px;
-    }
-    img {
-      width: 120px;
-      border-radius: 50%;
-      display: block;
-      margin: 0 auto 20px;
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
     }
     h1 {
       text-align: center;
+      margin-bottom: 1.5rem;
     }
-    p {
-      line-height: 1.6;
+    .info {
+      margin-bottom: 1rem;
+      font-size: 1.1rem;
     }
-    .contact {
-      margin-top: 20px;
+    .info span {
+      font-weight: bold;
+    }
+    footer {
       text-align: center;
-   -decoration: none;
+      margin-top: 2rem;
+      font-size: 0.9rem;
+      color: #888;
     }
   </style>
 </head>
 <body>
   <div class="container">
-  <!-- Centered Image -->
-  <div style="text-align: center;">
-    <img src="https://img.theweek.in/content/dam/week/gallery/shots/2023/may-07-2023/people/72-Aryan-Khan.jpg" alt="Your Photo" style="width: 120px; border-radius: 50%;" />
+    <h1>🚶 Pedometer</h1>
+
+    <div class="info">Steps: <span id="steps">0</span></div>
+    <div class="info">Distance: <span id="distance">0.00</span> meters</div>
+
+    <div class="info">Location: <span id="location">Loading...</span></div>
+    <div class="info">Weather: <span id="weather">Loading...</span></div>
+
+    <footer>Made with 💻 JS Web APIs</footer>
   </div>
-  
-  <div class="container">
 
+  <script>
+    // === STEP COUNTING ===
+    let stepCount = 0;
+    let lastAcc = { x: null, y: null, z: null };
+    let stepThreshold = 12; // adjust if needed
 
-    <!-- Name and Bio -->
-    <h1>Dushyant Rana</h1>
-    <p>
-      Hello! I'm a student passionate about technology and wants to build a bright career. I am pursuing BBIS at LIHE. My hobbies include playing cricket every weekends. I am learning to play table tennis.
+    window.addEventListener('devicemotion', (event) => {
+      const acc = event.accelerationIncludingGravity;
+      if (!acc.x || !acc.y || !acc.z) return;
 
-    <!-- Contact Info -->
-    <div class="contact">
-      
-      <p>Email: <a href="mailto:someone@example.com">abc.com</a></p>
+      let delta =
+        Math.abs(acc.x - lastAcc.x) +
+        Math.abs(acc.y - lastAcc.y) +
+        Math.abs(acc.z - lastAcc.z);
 
-    </div>
-  </div>
+      if (delta > stepThreshold) {
+        stepCount++;
+        document.getElementById('steps').textContent = stepCount;
+        document.getElementById('distance').textContent = (stepCount * 0.762).toFixed(2); // Avg step length in meters
+      }
+
+      lastAcc = { x: acc.x, y: acc.y, z: acc.z };
+    });
+
+    // === GEOLOCATION & WEATHER ===
+    const locationSpan = document.getElementById('location');
+    const weatherSpan = document.getElementById('weather');
+
+    let currentCoords = { lat: null, lon: null };
+    const apiKey = 'YOUR_API_KEY_HERE'; // <-- Replace with your OpenWeatherMap API key
+
+    function fetchWeather(lat, lon) {
+      const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`;
+
+      fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          const temp = data.main.temp;
+          const desc = data.weather[0].description;
+          weatherSpan.textContent = `${temp}°C, ${desc}`;
+        })
+        .catch(err => {
+          weatherSpan.textContent = 'Weather data unavailable';
+        });
+    }
+
+    function updateLocation(lat, lon) {
+      currentCoords = { lat, lon };
+      locationSpan.textContent = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+      fetchWeather(lat, lon); // Immediate weather fetch on location change
+    }
+
+    function startGeolocation() {
+      if (!navigator.geolocation) {
+        locationSpan.textContent = 'Geolocation not supported';
+        return;
+      }
+
+      navigator.geolocation.watchPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          updateLocation(latitude, longitude);
+        },
+        (error) => {
+          locationSpan.textContent = 'Location unavailable';
+          weatherSpan.textContent = 'Weather unavailable';
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 5000,
+          timeout: 10000,
+        }
+      );
+    }
+
+    // === Periodic Weather Update ===
+    setInterval(() => {
+      if (currentCoords.lat && currentCoords.lon) {
+        fetchWeather(currentCoords.lat, currentCoords.lon);
+      }
+    }, 10 * 60 * 1000); // Every 10 minutes
+
+    // === Request motion access on iOS ===
+    window.addEventListener('load', () => {
+      if (typeof DeviceMotionEvent !== 'undefined' &&
+          typeof DeviceMotionEvent.requestPermission === 'function') {
+        DeviceMotionEvent.requestPermission()
+          .then(response => {
+            if (response === 'granted') {
+              console.log('Motion access granted');
+            }
+          })
+          .catch(console.error);
+      }
+
+      startGeolocation();
+    });
+  </script>
 </body>
 </html>
